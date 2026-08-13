@@ -7,14 +7,15 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY server/package.json server/package-lock.json* ./
 RUN npm install --omit=dev
 
 # Download scrcpy-server jar (v3.3.3) used by AdbScrcpyClient.pushServer
 RUN npx fetch-scrcpy-server 3.3.3 \
   && cp node_modules/@yume-chan/fetch-scrcpy-server/server.bin /app/scrcpy-server.bin
 
-COPY . .
+COPY server/ .
+COPY web/ /web/
 
 ENV PORT=8080 \
     DEVICE_HOST=10.141.10.152 \

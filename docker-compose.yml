@@ -1,6 +1,8 @@
 services:
   sixdroid:
-    build: ./server
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     container_name: sixdroid
     restart: unless-stopped
     ports:
