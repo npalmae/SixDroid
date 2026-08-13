@@ -59,3 +59,17 @@ canvas {
   touch-action: none;
 }
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
+.diagnostics {
+  margin-top: 14px; background: #090c11; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.diagnostics-title {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; border-bottom: 1px solid var(--border);
+  color: var(--muted); font-size: 12px; text-transform: uppercase;
+}
+.diagnostics-title button { padding: 3px 8px; font-size: 11px; }
+#screen-log {
+  margin: 0; padding: 10px; height: 180px; overflow: auto;
+  color: #9dc1ff; font-size: 11px; line-height: 1.55; white-space: pre-wrap;
+}

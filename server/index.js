@@ -65,10 +65,16 @@ async function acquireSession(adbPort) {
     entry = { session, refs: 0, starting: null };
     sessions.set(adbPort, entry);
     entry.starting = (async () => {
+      console.log(`[scrcpy:${adbPort}] connecting adb`);
       session.adb = await getAdb(adbPort);
+      console.log(`[scrcpy:${adbPort}] starting server`);
       await session.start();
+      console.log(`[scrcpy:${adbPort}] ready ${session.width}x${session.height}`);
     })();
-    entry.starting.catch(() => sessions.delete(adbPort));
+    entry.starting.catch((error) => {
+      console.error(`[scrcpy:${adbPort}] start failed`, error);
+      sessions.delete(adbPort);
+    });
   }
   await entry.starting;
   entry.refs++;
@@ -87,10 +93,12 @@ const streamWss = new WebSocketServer({ noServer: true });
 const controlWss = new WebSocketServer({ noServer: true });
 
 streamWss.on("connection", async (ws, adbPort) => {
+  console.log(`[ws:${adbPort}] stream connected`);
   let entry;
   try {
     entry = await acquireSession(adbPort);
   } catch (e) {
+    console.error(`[ws:${adbPort}] stream failed`, e);
     ws.close(1011, `scrcpy start failed: ${e.message}`);
     return;
   }
@@ -101,6 +109,7 @@ streamWss.on("connection", async (ws, adbPort) => {
   session.flushPackets();
   session.onClose = () => ws.close(1000, "scrcpy exited");
   ws.on("close", () => {
+    console.log(`[ws:${adbPort}] stream closed`);
     session.onPacket = undefined;
     session.onClose = undefined;
     releaseSession(adbPort, entry);
@@ -108,10 +117,12 @@ streamWss.on("connection", async (ws, adbPort) => {
 });
 
 controlWss.on("connection", async (ws, adbPort) => {
+  console.log(`[ws:${adbPort}] control connected`);
   let entry;
   try {
     entry = await acquireSession(adbPort);
   } catch (e) {
+    console.error(`[ws:${adbPort}] control failed`, e);
     ws.close(1011, `scrcpy start failed: ${e.message}`);
     return;
   }

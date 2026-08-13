@@ -9,6 +9,7 @@ const screenView = document.getElementById("screen-view");
 const screenTitle = document.getElementById("screen-title");
 const screenStatus = document.getElementById("screen-status");
 const canvas = document.getElementById("screen-canvas");
+const screenLog = document.getElementById("screen-log");
 
 let player = null;
 
@@ -82,10 +83,16 @@ function openScreen(inst) {
   instancesView.classList.add("hidden");
   screenView.classList.remove("hidden");
   screenTitle.textContent = `${inst.name} (Android ${inst.androidVersion}, :${inst.adbPort})`;
+  screenLog.textContent = "";
   player = new ScreenPlayer({
     canvas,
     adbPort: inst.adbPort,
     onStatus: (s) => (screenStatus.textContent = s),
+    onLog: (message) => {
+      const time = new Date().toLocaleTimeString();
+      screenLog.textContent += `[${time}] ${message}\n`;
+      screenLog.scrollTop = screenLog.scrollHeight;
+    },
   });
   player.start();
 }
@@ -99,6 +106,7 @@ function closeScreen() {
 }
 
 document.getElementById("btn-back-list").onclick = closeScreen;
+document.getElementById("btn-clear-log").onclick = () => (screenLog.textContent = "");
 
 createForm.onsubmit = async (e) => {
   e.preventDefault();

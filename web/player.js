@@ -28,34 +28,53 @@ function mapKey(e) {
 }
 
 export class ScreenPlayer {
-  constructor({ canvas, adbPort, onStatus }) {
+  constructor({ canvas, adbPort, onStatus, onLog }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.adbPort = adbPort;
     this.onStatus = onStatus || (() => {});
+    this.onLog = onLog || (() => {});
     this.decoder = null;
     this.meta = null;
     this.configSeen = false;
     this.stopped = false;
     this.boundKeys = [];
+    this.packetCount = 0;
   }
 
   status(s) { this.onStatus(s); }
+  log(s) { this.onLog(s); }
 
   start() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
+    this.log(`opening stream websocket /ws/stream/${this.adbPort}`);
+    this.log(`opening control websocket /ws/control/${this.adbPort}`);
     this.streamWs = new WebSocket(`${proto}://${location.host}/ws/stream/${this.adbPort}`);
     this.streamWs.binaryType = "arraybuffer";
     this.controlWs = new WebSocket(`${proto}://${location.host}/ws/control/${this.adbPort}`);
-    this.streamWs.onopen = () => this.status("connecting…");
-    this.streamWs.onmessage = (e) => this.handlePacket(new Uint8Array(e.data));
+    this.streamWs.onopen = () => {
+      this.status("connecting…");
+      this.log("stream websocket connected");
+    };
+    this.controlWs.onopen = () => this.log("control websocket connected");
+    this.controlWs.onerror = () => this.log("control websocket error");
+    this.controlWs.onclose = (e) => this.log(`control websocket closed: ${e.code} ${e.reason || ""}`);
+    this.streamWs.onmessage = (e) => {
+      const bytes = new Uint8Array(e.data);
+      this.packetCount++;
+      if (this.packetCount <= 5 || this.packetCount % 100 === 0) {
+        this.log(`packet #${this.packetCount} type=0x${bytes[0].toString(16).padStart(2, "0")} bytes=${bytes.length}`);
+      }
+      this.handlePacket(bytes);
+    };
     this.streamWs.onclose = (e) => {
       if (!this.stopped) {
+        this.log(`stream websocket closed: ${e.code} ${e.reason || ""}`);
         this.status(`disconnected (${e.reason || e.code}), retrying in 2s`);
         setTimeout(() => !this.stopped && this.start(), 2000);
       }
     };
-    this.streamWs.onerror = () => {};
+    this.streamWs.onerror = () => this.log("stream websocket error");
     this.attachInput();
   }
 
@@ -82,6 +101,7 @@ export class ScreenPlayer {
       },
       error: (err) => {
         console.error("decoder error", err);
+        this.log(`decoder error: ${err.message || err}`);
         // reconnect: scrcpy will re-send a keyframe
         try { this.streamWs?.close(); } catch {}
       },
@@ -91,6 +111,7 @@ export class ScreenPlayer {
       hardwareAcceleration: "prefer-hardware",
       optimizeForLatency: true,
     });
+    this.log("WebCodecs decoder configured: avc1.42E01E");
     this.status("streaming");
   }
 
@@ -98,12 +119,14 @@ export class ScreenPlayer {
     const kind = bytes[0];
     if (kind === 0x00) {
       this.meta = JSON.parse(new TextDecoder().decode(bytes.subarray(1)));
+      this.log(`metadata: ${JSON.stringify(this.meta)}`);
       this.status(`streaming ${this.meta.width}x${this.meta.height}`);
       return;
     }
     if (kind === 0x02) {
       // configuration packet (SPS/PPS, annexb) — decode as a key chunk
       this.configSeen = true;
+      this.log(`H264 configuration received (${bytes.length - 1} bytes)`);
       this.initDecoder();
       this.decode(bytes.subarray(1), true, 0);
       return;
@@ -127,6 +150,7 @@ export class ScreenPlayer {
       }));
     } catch (e) {
       console.error("decode error", e);
+      this.log(`decode exception: ${e.message || e}`);
     }
   }
 
@@ -177,3 +201,5 @@ export class ScreenPlayer {
     });
   }
 }
+    this.log(`opening stream websocket /ws/stream/${this.adbPort}`);
+    this.log(`opening control websocket /ws/control/${this.adbPort}`);
