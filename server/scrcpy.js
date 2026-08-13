@@ -9,7 +9,7 @@
  */
 import fs from "node:fs";
 import { Readable } from "node:stream";
-import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from "@yume-chan/adb-scrcpy";
+import { AdbScrcpyClient, AdbScrcpyOptions3_3_3 } from "@yume-chan/adb-scrcpy";
 import {
   AndroidMotionEventAction,
   AndroidMotionEventButton,
@@ -44,20 +44,12 @@ export class ScrcpySession {
     const fileStream = Readable.toWeb(fs.createReadStream(SERVER_PATH));
     await AdbScrcpyClient.pushServer(this.adb, fileStream, SERVER_DEVICE_PATH);
 
-    const options = new AdbScrcpyOptionsLatest({
+    const options = new AdbScrcpyOptions3_3_3({
       video: true,
       audio: false,
       control: true,
       videoCodec: "h264",
       maxSize: 1280,
-      // software encoder works on redroid (no HW encoders)
-      videoEncoder: "OMX.google.h264.encoder",
-      powerOn: true,
-      clipboardAutosync: false,
-      sendDeviceMeta: true,
-      sendCodecMeta: true,
-      sendFrameMeta: true,
-      sendDummyByte: true,
     });
 
     this.client = await AdbScrcpyClient.start(this.adb, SERVER_DEVICE_PATH, options);
@@ -65,8 +57,8 @@ export class ScrcpySession {
     const video = await this.client.videoStream;
     if (!video) throw new Error("scrcpy did not provide a video stream");
 
-    this.width = video.width || 0;
-    this.height = video.height || 0;
+    this.width = video.metadata.width || 0;
+    this.height = video.metadata.height || 0;
 
     // metadata message
     const meta = {
