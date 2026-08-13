@@ -1,5 +1,5 @@
-// Instance list management + view switching
-import { ScreenPlayer } from "./player.js";
+// Instance list management + view switching. The video player is imported
+// lazily so unsupported WebCodecs cannot prevent the instance list loading.
 
 const tbody = document.querySelector("#instances-table tbody");
 const createForm = document.getElementById("create-form");
@@ -79,11 +79,19 @@ async function refresh() {
   }
 }
 
-function openScreen(inst) {
+async function openScreen(inst) {
   instancesView.classList.add("hidden");
   screenView.classList.remove("hidden");
   screenTitle.textContent = `${inst.name} (Android ${inst.androidVersion}, :${inst.adbPort})`;
   screenLog.textContent = "";
+  let ScreenPlayer;
+  try {
+    ({ ScreenPlayer } = await import("./player.js"));
+  } catch (error) {
+    screenStatus.textContent = "player unavailable";
+    screenLog.textContent = `Could not load player: ${error.message || error}`;
+    return;
+  }
   player = new ScreenPlayer({
     canvas,
     adbPort: inst.adbPort,
@@ -124,6 +132,12 @@ createForm.onsubmit = async (e) => {
   }
   refresh();
 };
+
+window.addEventListener("error", (event) => {
+  if (tbody.children.length === 0 || tbody.textContent.includes("Loading instances")) {
+    tbody.innerHTML = `<tr><td colspan="5">JavaScript error: ${event.message}</td></tr>`;
+  }
+});
 
 refresh();
 setInterval(() => { if (!screenView.classList.contains("hidden")) return; refresh(); }, 5000);
