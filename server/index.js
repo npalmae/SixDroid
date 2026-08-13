@@ -68,6 +68,7 @@ app.delete("/api/instances/:id", wrap(async (req, res) => {
 app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "file is required" });
 
+  let localPath = req.file.path;
   try {
     const ports = JSON.parse(req.body.ports || "[]").map(Number);
     const action = req.body.action === "install" ? "install" : "copy";
@@ -79,12 +80,16 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
     if (action === "install" && !safeName.toLowerCase().endsWith(".apk")) {
       return res.status(400).json({ error: "only APK files can be installed" });
     }
+    if (action === "install") {
+      localPath = `${req.file.path}.apk`;
+      await fs.rename(req.file.path, localPath);
+    }
 
     const results = await Promise.all(targets.map(async (port) => {
       try {
         const args = action === "install"
-          ? ["install", "-r", req.file.path]
-          : ["push", req.file.path, `/sdcard/Download/${safeName}`];
+          ? ["install", "-r", localPath]
+          : ["push", localPath, `/sdcard/Download/${safeName}`];
         const { stdout, stderr } = await runAdb(port, args, { timeout: 10 * 60 * 1000 });
         return { port, name: allowed.get(port).name, ok: true, message: (stdout || stderr).trim() };
       } catch (error) {
@@ -93,7 +98,8 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
     }));
     res.json({ action, filename: safeName, results });
   } finally {
-    await fs.unlink(req.file.path).catch(() => {});
+    await fs.unlink(localPath).catch(() => {});
+    if (localPath !== req.file.path) await fs.unlink(req.file.path).catch(() => {});
   }
 }));
 
