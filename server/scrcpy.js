@@ -38,16 +38,25 @@ export class ScrcpySession {
     this.onPacket = undefined; // (Buffer) => void, binary message for browser
     this.onClose = undefined;
     this.pendingPackets = [];
+    this.bootstrapPackets = new Map();
   }
 
   emitPacket(packet) {
+    if (packet[0] === 0x00 || packet[0] === 0x02) {
+      this.bootstrapPackets.set(packet[0], packet);
+    }
     if (this.onPacket) this.onPacket(packet);
     else this.pendingPackets.push(packet);
   }
 
   flushPackets() {
     if (!this.onPacket) return;
-    for (const packet of this.pendingPackets.splice(0)) this.onPacket(packet);
+    const pending = this.pendingPackets.splice(0);
+    if (pending.length) {
+      for (const packet of pending) this.onPacket(packet);
+      return;
+    }
+    for (const packet of this.bootstrapPackets.values()) this.onPacket(packet);
   }
 
   async start() {
