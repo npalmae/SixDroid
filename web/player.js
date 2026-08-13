@@ -90,6 +90,12 @@ export class ScreenPlayer {
 
   initDecoder() {
     if (this.decoder) return;
+    if (!("VideoDecoder" in window)) {
+      const message = `WebCodecs VideoDecoder is unavailable in this browser (${navigator.userAgent})`;
+      this.status("browser not supported");
+      this.log(message);
+      throw new Error(message);
+    }
     this.decoder = new VideoDecoder({
       output: (frame) => {
         if (this.canvas.width !== frame.displayWidth || this.canvas.height !== frame.displayHeight) {
@@ -106,11 +112,17 @@ export class ScreenPlayer {
         try { this.streamWs?.close(); } catch {}
       },
     });
-    this.decoder.configure({
-      codec: "avc1.42E01E", // H264 baseline; annexb data carries SPS/PPS anyway
-      hardwareAcceleration: "prefer-hardware",
-      optimizeForLatency: true,
-    });
+    try {
+      this.decoder.configure({
+        codec: "avc1.42E01E", // H264 baseline; annexb data carries SPS/PPS anyway
+        hardwareAcceleration: "prefer-hardware",
+        optimizeForLatency: true,
+      });
+    } catch (error) {
+      this.status("decoder unavailable");
+      this.log(`VideoDecoder configure failed: ${error.message || error}`);
+      throw error;
+    }
     this.log("WebCodecs decoder configured: avc1.42E01E");
     this.status("streaming");
   }
