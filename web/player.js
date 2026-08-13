@@ -37,6 +37,7 @@ export class ScreenPlayer {
     this.decoder = null;
     this.meta = null;
     this.configSeen = false;
+    this.codecConfig = null;
     this.stopped = false;
     this.boundKeys = [];
     this.packetCount = 0;
@@ -136,11 +137,12 @@ export class ScreenPlayer {
       return;
     }
     if (kind === 0x02) {
-      // configuration packet (SPS/PPS, annexb) — decode as a key chunk
+      // Keep Annex B SPS/PPS and prepend it to the first IDR frame. WebCodecs
+      // requires the first chunk after configure() to be a complete keyframe.
       this.configSeen = true;
+      this.codecConfig = bytes.slice(1);
       this.log(`H264 configuration received (${bytes.length - 1} bytes)`);
       this.initDecoder();
-      this.decode(bytes.subarray(1), true, 0);
       return;
     }
     if (kind === 0x01) {
@@ -148,7 +150,16 @@ export class ScreenPlayer {
       const keyframe = (view.getUint8(1) & 1) !== 0;
       const pts = view.getBigInt64(2, false);
       this.initDecoder();
-      this.decode(bytes.subarray(10), keyframe, pts < 0n ? undefined : pts);
+      let data = bytes.subarray(10);
+      if (keyframe && this.codecConfig) {
+        const completeKeyframe = new Uint8Array(this.codecConfig.length + data.length);
+        completeKeyframe.set(this.codecConfig);
+        completeKeyframe.set(data, this.codecConfig.length);
+        data = completeKeyframe;
+        this.codecConfig = null;
+        this.log(`decoding first complete keyframe (${data.length} bytes)`);
+      }
+      this.decode(data, keyframe, pts < 0n ? undefined : pts);
     }
   }
 
