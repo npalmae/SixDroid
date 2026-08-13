@@ -49,7 +49,7 @@ async function refresh() {
     const booted = inst.status === "running" ? (inst.booted ? " · booted" : " · booting…") : "";
     tr.innerHTML = `
       <td>${inst.name}</td>
-      <td>${inst.androidVersion}</td>
+      <td>${inst.androidVersion}${inst.gapps ? " · GApps" : ""}</td>
       <td class="${statusCls}">${inst.status}${booted}</td>
       <td>${inst.adbPort ?? "-"}</td>
       <td class="actions"></td>`;

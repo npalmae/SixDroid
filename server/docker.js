@@ -49,7 +49,8 @@ async function toInstance(c) {
     name,
     image: c.Image,
     status,
-    androidVersion: parseAndroidVersion(c.Image),
+    androidVersion: c.Labels?.["sixdroid.version"] || parseAndroidVersion(c.Image),
+    gapps: c.Labels?.["sixdroid.gapps"] === "true",
     adbPort: parseAdbPort(c),
     booted: await isBooted(c.Id, status),
   };
@@ -57,7 +58,9 @@ async function toInstance(c) {
 
 export async function listInstances() {
   const containers = await docker.listContainers({ all: true });
-  const redroids = containers.filter((c) => c.Image.startsWith(IMAGE_PREFIX));
+  const redroids = containers.filter((c) =>
+    c.Image.startsWith(IMAGE_PREFIX) || c.Labels?.["sixdroid.android"] === "true"
+  );
   return Promise.all(redroids.map(toInstance));
 }
 
