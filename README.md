@@ -24,6 +24,17 @@ DEVICE_HOST=10.141.10.152 docker compose up --build
 
 Open http://localhost:8080
 
+### Native scrcpy launcher (macOS)
+
+Run the localhost companion once per Mac session:
+
+```sh
+node tools/sixdroid-launcher.js
+```
+
+The panel's **Abrir scrcpy** button then opens the selected Android in native
+scrcpy. Install it with `brew install scrcpy`.
+
 `DEVICE_HOST` must be the host IP reachable from inside the sixdroid container
 (where redroid adb ports are published). Default: `10.141.10.152`.
 
