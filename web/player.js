@@ -201,5 +201,3 @@ export class ScreenPlayer {
     });
   }
 }
-    this.log(`opening stream websocket /ws/stream/${this.adbPort}`);
-    this.log(`opening control websocket /ws/control/${this.adbPort}`);
