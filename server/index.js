@@ -98,6 +98,7 @@ streamWss.on("connection", async (ws, adbPort) => {
   session.onPacket = (buf) => {
     if (ws.readyState === ws.OPEN) ws.send(buf);
   };
+  session.flushPackets();
   session.onClose = () => ws.close(1000, "scrcpy exited");
   ws.on("close", () => {
     session.onPacket = undefined;

@@ -37,6 +37,17 @@ export class ScrcpySession {
     this.height = 0;
     this.onPacket = undefined; // (Buffer) => void, binary message for browser
     this.onClose = undefined;
+    this.pendingPackets = [];
+  }
+
+  emitPacket(packet) {
+    if (this.onPacket) this.onPacket(packet);
+    else this.pendingPackets.push(packet);
+  }
+
+  flushPackets() {
+    if (!this.onPacket) return;
+    for (const packet of this.pendingPackets.splice(0)) this.onPacket(packet);
   }
 
   async start() {
@@ -67,30 +78,35 @@ export class ScrcpySession {
       height: this.height,
       codec: video.metadata.codec === ScrcpyVideoCodecId.H264 ? "h264" : "other",
     };
-    this.onPacket?.(Buffer.concat([Buffer.from([0x00]), Buffer.from(JSON.stringify(meta), "utf8")]));
+    this.emitPacket(Buffer.concat([Buffer.from([0x00]), Buffer.from(JSON.stringify(meta), "utf8")]));
 
-    // consume video packets
-    const reader = video.stream.getReader();
-    try {
-      while (true) {
-        const { done, value: packet } = await reader.read();
-        if (done) break;
-        if (packet.type === "configuration") {
-          // SPS/PPS in annexb
-          this.onPacket?.(Buffer.concat([Buffer.from([0x02]), Buffer.from(packet.data)]));
-        } else {
-          const flags = packet.keyframe ? 1 : 0;
-          const pts = packet.pts ?? -1n;
-          const header = Buffer.allocUnsafe(10);
-          header.writeUInt8(0x01, 0);
-          header.writeUInt8(flags, 1);
-          header.writeBigInt64BE(pts, 2);
-          this.onPacket?.(Buffer.concat([header, Buffer.from(packet.data)]));
+    // Consume the unbounded video stream in the background so start() can
+    // resolve and the WebSocket handler can attach its packet callback.
+    void (async () => {
+      const reader = video.stream.getReader();
+      try {
+        while (true) {
+          const { done, value: packet } = await reader.read();
+          if (done) break;
+          if (packet.type === "configuration") {
+            this.emitPacket(Buffer.concat([Buffer.from([0x02]), Buffer.from(packet.data)]));
+          } else {
+            const flags = packet.keyframe ? 1 : 0;
+            const pts = packet.pts ?? -1n;
+            const header = Buffer.allocUnsafe(10);
+            header.writeUInt8(0x01, 0);
+            header.writeUInt8(flags, 1);
+            header.writeBigInt64BE(pts, 2);
+            this.emitPacket(Buffer.concat([header, Buffer.from(packet.data)]));
+          }
         }
+      } catch (error) {
+        console.error(`scrcpy stream :${this.adbPort} failed`, error);
+      } finally {
+        reader.releaseLock();
+        this.onClose?.();
       }
-    } finally {
-      reader.releaseLock();
-    }
+    })();
 
     this.client.exited.then(() => this.onClose?.()).catch(() => this.onClose?.());
   }
