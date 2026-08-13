@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs/promises";
+import multer from "multer";
 import {
   listInstances,
   createInstance,
@@ -10,11 +12,17 @@ import {
   stopInstance,
   deleteInstance,
 } from "./docker.js";
-import { getAdb } from "./adb.js";
+import { getAdb, runAdb } from "./adb.js";
 import { ScrcpySession } from "./scrcpy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
+const uploadDir = "/tmp/sixdroid-uploads";
+await fs.mkdir(uploadDir, { recursive: true });
+const upload = multer({
+  dest: uploadDir,
+  limits: { fileSize: 500 * 1024 * 1024, files: 1 },
+});
 
 const app = express();
 app.use((_req, res, next) => {
@@ -55,6 +63,38 @@ app.post("/api/instances/:id/stop", wrap(async (req, res) => {
 app.delete("/api/instances/:id", wrap(async (req, res) => {
   await deleteInstance(req.params.id);
   res.json({ ok: true });
+}));
+
+app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "file is required" });
+
+  try {
+    const ports = JSON.parse(req.body.ports || "[]").map(Number);
+    const action = req.body.action === "install" ? "install" : "copy";
+    const safeName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._ -]/g, "_");
+    const instances = await listInstances();
+    const allowed = new Map(instances.filter((i) => i.status === "running").map((i) => [i.adbPort, i]));
+    const targets = [...new Set(ports)].filter((port) => allowed.has(port));
+    if (!targets.length) return res.status(400).json({ error: "select at least one running Android" });
+    if (action === "install" && !safeName.toLowerCase().endsWith(".apk")) {
+      return res.status(400).json({ error: "only APK files can be installed" });
+    }
+
+    const results = await Promise.all(targets.map(async (port) => {
+      try {
+        const args = action === "install"
+          ? ["install", "-r", req.file.path]
+          : ["push", req.file.path, `/sdcard/Download/${safeName}`];
+        const { stdout, stderr } = await runAdb(port, args, { timeout: 10 * 60 * 1000 });
+        return { port, name: allowed.get(port).name, ok: true, message: (stdout || stderr).trim() };
+      } catch (error) {
+        return { port, name: allowed.get(port).name, ok: false, message: error.stderr?.trim() || error.message };
+      }
+    }));
+    res.json({ action, filename: safeName, results });
+  } finally {
+    await fs.unlink(req.file.path).catch(() => {});
+  }
 }));
 
 const server = createServer(app);

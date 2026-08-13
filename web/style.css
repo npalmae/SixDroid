@@ -59,6 +59,16 @@ canvas {
   touch-action: none;
 }
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
+.share-targets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.share-targets label {
+  flex-direction: row; align-items: center; padding: 7px 10px;
+  border: 1px solid var(--border); border-radius: 6px; color: var(--fg);
+}
+.share-targets input { margin: 0; }
+.share-result {
+  min-height: 20px; margin: 12px 0 0; color: #9dc1ff;
+  white-space: pre-wrap; font-size: 12px;
+}
 .diagnostics {
   margin-top: 14px; background: #090c11; border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden;

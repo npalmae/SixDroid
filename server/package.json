@@ -16,6 +16,7 @@
     "@yume-chan/scrcpy": "^2.3.0",
     "dockerode": "^5.0.1",
     "express": "^4.21.2",
+    "multer": "^2.2.0",
     "ws": "^8.18.0"
   }
 }

@@ -39,6 +39,22 @@
           <tbody><tr><td colspan="5">Loading instances…</td></tr></tbody>
         </table>
       </div>
+
+      <div class="panel">
+        <h2>Share files</h2>
+        <form id="share-form">
+          <label>File <input id="share-file" type="file" required /></label>
+          <label>Action
+            <select id="share-action">
+              <option value="copy">Copy to Downloads</option>
+              <option value="install">Install APK</option>
+            </select>
+          </label>
+          <button type="submit">Send</button>
+        </form>
+        <div id="share-targets" class="share-targets"></div>
+        <pre id="share-result" class="share-result"></pre>
+      </div>
     </section>
 
     <section id="screen-view" class="hidden">

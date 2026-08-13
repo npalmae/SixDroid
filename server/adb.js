@@ -11,6 +11,15 @@ export const DEVICE_HOST = process.env.DEVICE_HOST || "10.141.10.152";
 const connector = new AdbServerNodeTcpConnector({ host: "127.0.0.1", port: 5037 });
 export const adbServer = new AdbServerClient(connector);
 
+export async function runAdb(adbPort, args, options = {}) {
+  const serial = `${DEVICE_HOST}:${adbPort}`;
+  await execFileAsync("adb", ["connect", serial]);
+  return execFileAsync("adb", ["-s", serial, ...args], {
+    maxBuffer: 10 * 1024 * 1024,
+    ...options,
+  });
+}
+
 /**
  * Lazily `adb connect DEVICE_HOST:adbPort` and return a Tango `Adb` instance
  * for that device. Retries a couple of times because redroid takes a while

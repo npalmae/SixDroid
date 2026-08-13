@@ -10,6 +10,9 @@ const screenTitle = document.getElementById("screen-title");
 const screenStatus = document.getElementById("screen-status");
 const canvas = document.getElementById("screen-canvas");
 const screenLog = document.getElementById("screen-log");
+const shareForm = document.getElementById("share-form");
+const shareTargets = document.getElementById("share-targets");
+const shareResult = document.getElementById("share-result");
 
 let player = null;
 
@@ -42,6 +45,14 @@ async function refresh() {
     return;
   }
   if (!portInput.value) portInput.value = suggestPort(instances);
+  const selectedPorts = new Set([...shareTargets.querySelectorAll("input:checked")].map((input) => Number(input.value)));
+  shareTargets.innerHTML = "";
+  for (const inst of instances.filter((item) => item.status === "running" && item.adbPort)) {
+    const label = document.createElement("label");
+    const checked = selectedPorts.size ? selectedPorts.has(inst.adbPort) : true;
+    label.innerHTML = `<input type="checkbox" value="${inst.adbPort}" ${checked ? "checked" : ""}> ${inst.name} (:${inst.adbPort})`;
+    shareTargets.appendChild(label);
+  }
   tbody.innerHTML = "";
   for (const inst of instances) {
     const tr = document.createElement("tr");
@@ -119,6 +130,36 @@ function closeScreen() {
 
 document.getElementById("btn-back-list").onclick = closeScreen;
 document.getElementById("btn-clear-log").onclick = () => (screenLog.textContent = "");
+
+shareForm.onsubmit = async (event) => {
+  event.preventDefault();
+  const file = document.getElementById("share-file").files[0];
+  const ports = [...shareTargets.querySelectorAll("input:checked")].map((input) => Number(input.value));
+  if (!file || !ports.length) {
+    shareResult.textContent = "Select a file and at least one Android.";
+    return;
+  }
+
+  const button = shareForm.querySelector("button");
+  const data = new FormData();
+  data.append("file", file);
+  data.append("ports", JSON.stringify(ports));
+  data.append("action", document.getElementById("share-action").value);
+  button.disabled = true;
+  shareResult.textContent = `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)…`;
+  try {
+    const response = await fetch("/api/files/distribute", { method: "POST", body: data });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || response.statusText);
+    shareResult.textContent = result.results.map((item) =>
+      `${item.ok ? "OK" : "ERROR"} ${item.name}: ${item.message}`
+    ).join("\n");
+  } catch (error) {
+    shareResult.textContent = `ERROR: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+};
 
 createForm.onsubmit = async (e) => {
   e.preventDefault();
