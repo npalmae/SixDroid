@@ -58,6 +58,11 @@ export class ScreenPlayer {
       this.log("stream websocket connected");
     };
     this.controlWs.onopen = () => this.log("control websocket connected");
+    this.controlWs.onmessage = (event) => {
+      const result = JSON.parse(event.data);
+      if (!result.ok) this.log(`control failed: ${result.error}`);
+      else if (result.action !== "move") this.log(`control acknowledged: ${result.type} ${result.action || ""}`);
+    };
     this.controlWs.onerror = () => this.log("control websocket error");
     this.controlWs.onclose = (e) => this.log(`control websocket closed: ${e.code} ${e.reason || ""}`);
     this.streamWs.onmessage = (e) => {
@@ -180,6 +185,9 @@ export class ScreenPlayer {
   sendControl(msg) {
     if (this.controlWs?.readyState === WebSocket.OPEN) {
       this.controlWs.send(JSON.stringify(msg));
+      if (msg.action !== "move") this.log(`control sent: ${msg.type} ${msg.action || ""}`);
+    } else {
+      this.log(`control not sent: websocket state ${this.controlWs?.readyState ?? "missing"}`);
     }
   }
 

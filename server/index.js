@@ -131,16 +131,22 @@ controlWss.on("connection", async (ws, adbPort) => {
     return;
   }
   const { session } = entry;
-  ws.on("message", (raw) => {
+  ws.on("message", async (raw) => {
     let msg;
     try {
       msg = JSON.parse(raw.toString());
     } catch {
       return;
     }
-    if (msg.type === "touch") session.injectTouch(msg).catch(() => {});
-    else if (msg.type === "key") session.injectKey(msg).catch(() => {});
-    else if (msg.type === "text") session.injectText(String(msg.text)).catch(() => {});
+    try {
+      if (msg.type === "touch") await session.injectTouch(msg);
+      else if (msg.type === "key") await session.injectKey(msg);
+      else if (msg.type === "text") await session.injectText(String(msg.text));
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ ok: true, type: msg.type, action: msg.action }));
+    } catch (error) {
+      console.error(`[ws:${adbPort}] control ${msg.type} failed`, error);
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ ok: false, error: error.message }));
+    }
   });
   ws.on("close", () => releaseSession(adbPort, entry));
 });
