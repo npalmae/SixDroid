@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SixDroid</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>SixDroid</h1>
+    <span class="tag">redroid panel</span>
+  </header>
+
+  <main>
+    <section id="instances-view">
+      <div class="panel">
+        <h2>New instance</h2>
+        <form id="create-form">
+          <label>Name <input id="f-name" required placeholder="my-device" pattern="[a-zA-Z0-9_-]+" /></label>
+          <label>Android
+            <select id="f-version">
+              <option>13</option>
+              <option>14</option>
+              <option selected>15</option>
+            </select>
+          </label>
+          <label>Port <input id="f-port" type="number" min="1024" max="65535" required /></label>
+          <button type="submit">Create</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Instances</h2>
+        <table id="instances-table">
+          <thead>
+            <tr><th>Name</th><th>Android</th><th>Status</th><th>Port</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-view" class="hidden">
+      <div class="screen-toolbar">
+        <button id="btn-back-list">← Instances</button>
+        <span id="screen-title"></span>
+        <span id="screen-status"></span>
+      </div>
+      <canvas id="screen-canvas" width="720" height="1280"></canvas>
+      <p class="hint">Click/touch to interact. Esc=Back · Home=Home · Vol+/- mapped. Text keys are sent as key events.</p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

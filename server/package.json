@@ -1,0 +1,21 @@
+{
+  "name": "sixdroid-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "fetch-server": "fetch-scrcpy-server 3.3.3"
+  },
+  "dependencies": {
+    "@yume-chan/adb": "^2.6.2",
+    "@yume-chan/adb-scrcpy": "^2.3.2",
+    "@yume-chan/adb-server-node-tcp": "^2.5.2",
+    "@yume-chan/fetch-scrcpy-server": "^1.0.0",
+    "@yume-chan/scrcpy": "^2.3.0",
+    "dockerode": "^5.0.1",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
