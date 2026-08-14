@@ -36,6 +36,23 @@ def main():
             })
         return {"ok": True, "nodes": nodes}
 
+    if action == "tap":
+        device.click(int(request["x"]), int(request["y"]))
+        return {"ok": True, "action": action}
+    if action == "swipe":
+        device.swipe(
+            int(request["x1"]), int(request["y1"]),
+            int(request["x2"]), int(request["y2"]),
+            float(request.get("duration", 0.3)),
+        )
+        return {"ok": True, "action": action}
+    if action == "press":
+        key = request.get("key")
+        if key not in ("back", "home", "recent", "enter"):
+            raise ValueError("unsupported key")
+        device.press(key)
+        return {"ok": True, "action": action}
+
     target = selector(device, request.get("selector") or {})
     if not target.exists(timeout=3):
         raise ValueError("element not found")

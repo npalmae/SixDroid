@@ -113,11 +113,11 @@ app.post("/api/automation/:port", wrap(async (req, res) => {
   if (!instance) return res.status(404).json({ error: "running Android not found" });
 
   const action = req.body?.action;
-  if (!["inspect", "setText", "click"].includes(action)) {
+  if (!["inspect", "setText", "click", "tap", "swipe", "press"].includes(action)) {
     return res.status(400).json({ error: "unsupported automation action" });
   }
   const selector = req.body?.selector || {};
-  if (action !== "inspect" && ![selector.resourceId, selector.text, selector.description].some(Boolean)) {
+  if (["setText", "click"].includes(action) && ![selector.resourceId, selector.text, selector.description].some(Boolean)) {
     return res.status(400).json({ error: "selector is required" });
   }
 
@@ -127,6 +127,14 @@ app.post("/api/automation/:port", wrap(async (req, res) => {
     action,
     selector,
     value: String(req.body?.value ?? "").slice(0, 4096),
+    x: Number(req.body?.x),
+    y: Number(req.body?.y),
+    x1: Number(req.body?.x1),
+    y1: Number(req.body?.y1),
+    x2: Number(req.body?.x2),
+    y2: Number(req.body?.y2),
+    duration: Number(req.body?.duration) || 0.3,
+    key: req.body?.key,
   });
   try {
     const { stdout } = await execFileAsync("/opt/uia2/bin/python", ["/app/ui_automation.py", payload], {

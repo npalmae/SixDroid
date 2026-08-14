@@ -72,6 +72,14 @@ canvas {
 .automation-table-wrap { max-height: 360px; overflow: auto; margin-top: 10px; }
 #automation-table td { font-size: 11px; vertical-align: top; }
 #automation-table button { padding: 4px 7px; font-size: 10px; }
+.remote-pad { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.remote-coordinates { color: var(--muted); font-size: 12px; text-align: center; }
+.remote-coordinates input { width: 82px; display: inline-block; }
+.remote-grid { display: grid; grid-template-columns: repeat(3, 55px); gap: 6px; justify-content: center; margin: 10px 0; }
+.remote-grid button:first-child { grid-column: 2; }
+.remote-grid button:nth-child(2) { grid-column: 1; }
+.remote-grid button:nth-child(5) { grid-column: 2; }
+.remote-keys { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .diagnostics {
   margin-top: 14px; background: #090c11; border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden;

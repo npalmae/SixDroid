@@ -69,6 +69,22 @@
           <button type="button" id="automation-click" class="secondary">Click</button>
         </form>
         <pre id="automation-result" class="share-result"></pre>
+        <div class="remote-pad">
+          <div class="remote-coordinates">Cursor: <input id="remote-x" type="number" value="360" min="0" max="720"> × <input id="remote-y" type="number" value="640" min="0" max="1280"></div>
+          <div class="remote-grid">
+            <button type="button" data-move="0,-40">↑</button>
+            <button type="button" data-move="-40,0">←</button>
+            <button type="button" id="remote-tap">Tap</button>
+            <button type="button" data-move="40,0">→</button>
+            <button type="button" data-move="0,40">↓</button>
+          </div>
+          <div class="remote-keys">
+            <button type="button" data-key="back" class="secondary">Back</button>
+            <button type="button" data-key="home" class="secondary">Home</button>
+            <button type="button" data-swipe="up" class="secondary">Swipe ↑</button>
+            <button type="button" data-swipe="down" class="secondary">Swipe ↓</button>
+          </div>
+        </div>
         <div class="automation-table-wrap">
           <table id="automation-table">
             <thead><tr><th>Text / Description</th><th>Resource ID</th><th>Class</th><th></th></tr></thead>

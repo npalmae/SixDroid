@@ -187,6 +187,18 @@ async function automate(action, selector = automationSelector.value, value = aut
   return result;
 }
 
+async function remoteAction(body) {
+  const port = automationDevice.value;
+  const response = await fetch(`/api/automation/${port}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || response.statusText);
+  automationResult.textContent = `${body.action} sent successfully.`;
+}
+
 document.getElementById("automation-inspect").onclick = async () => {
   automationResult.textContent = "Inspecting screen…";
   try {
@@ -235,6 +247,30 @@ document.getElementById("automation-click").onclick = async () => {
     automationResult.textContent = `ERROR: ${error.message}`;
   }
 };
+
+const remoteX = document.getElementById("remote-x");
+const remoteY = document.getElementById("remote-y");
+document.querySelectorAll("[data-move]").forEach((button) => {
+  button.onclick = () => {
+    const [dx, dy] = button.dataset.move.split(",").map(Number);
+    remoteX.value = Math.max(0, Math.min(720, Number(remoteX.value) + dx));
+    remoteY.value = Math.max(0, Math.min(1280, Number(remoteY.value) + dy));
+  };
+});
+document.getElementById("remote-tap").onclick = () =>
+  remoteAction({ action: "tap", x: Number(remoteX.value), y: Number(remoteY.value) }).catch((error) => automationResult.textContent = `ERROR: ${error.message}`);
+document.querySelectorAll("[data-key]").forEach((button) => {
+  button.onclick = () => remoteAction({ action: "press", key: button.dataset.key }).catch((error) => automationResult.textContent = `ERROR: ${error.message}`);
+});
+document.querySelectorAll("[data-swipe]").forEach((button) => {
+  button.onclick = () => {
+    const x = Number(remoteX.value);
+    const y = Number(remoteY.value);
+    const dy = button.dataset.swipe === "up" ? -300 : 300;
+    remoteAction({ action: "swipe", x1: x, y1: y, x2: x, y2: Math.max(0, Math.min(1280, y + dy)) })
+      .catch((error) => automationResult.textContent = `ERROR: ${error.message}`);
+  };
+});
 
 createForm.onsubmit = async (e) => {
   e.preventDefault();
