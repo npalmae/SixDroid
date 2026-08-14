@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import multer from "multer";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   listInstances,
   createInstance,
@@ -17,6 +19,7 @@ import { ScrcpySession } from "./scrcpy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
+const execFileAsync = promisify(execFile);
 const uploadDir = "/tmp/sixdroid-uploads";
 await fs.mkdir(uploadDir, { recursive: true });
 const upload = multer({
@@ -100,6 +103,44 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
   } finally {
     await fs.unlink(localPath).catch(() => {});
     if (localPath !== req.file.path) await fs.unlink(req.file.path).catch(() => {});
+  }
+}));
+
+app.post("/api/automation/:port", wrap(async (req, res) => {
+  const port = Number(req.params.port);
+  const instances = await listInstances();
+  const instance = instances.find((item) => item.adbPort === port && item.status === "running");
+  if (!instance) return res.status(404).json({ error: "running Android not found" });
+
+  const action = req.body?.action;
+  if (!["inspect", "setText", "click"].includes(action)) {
+    return res.status(400).json({ error: "unsupported automation action" });
+  }
+  const selector = req.body?.selector || {};
+  if (action !== "inspect" && ![selector.resourceId, selector.text, selector.description].some(Boolean)) {
+    return res.status(400).json({ error: "selector is required" });
+  }
+
+  await runAdb(port, ["get-state"], { timeout: 30000 });
+  const payload = JSON.stringify({
+    serial: `${process.env.DEVICE_HOST || "10.141.10.152"}:${port}`,
+    action,
+    selector,
+    value: String(req.body?.value ?? "").slice(0, 4096),
+  });
+  try {
+    const { stdout } = await execFileAsync("/opt/uia2/bin/python", ["/app/ui_automation.py", payload], {
+      timeout: 120000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    res.json(JSON.parse(stdout));
+  } catch (error) {
+    const output = error.stdout?.trim();
+    if (output) {
+      const result = JSON.parse(output);
+      return res.status(400).json(result);
+    }
+    throw error;
   }
 }));
 

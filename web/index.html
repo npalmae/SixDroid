@@ -57,6 +57,25 @@
         <div id="share-targets" class="share-targets"></div>
         <pre id="share-result" class="share-result"></pre>
       </div>
+
+      <div class="panel">
+        <h2>UI Automation</h2>
+        <form id="automation-form">
+          <label>Android <select id="automation-device"></select></label>
+          <label>Resource ID <input id="automation-selector" placeholder="com.example:id/field" /></label>
+          <label>Text value <input id="automation-value" placeholder="Text to enter" /></label>
+          <button type="button" id="automation-inspect" class="secondary">Inspect screen</button>
+          <button type="submit">Set text</button>
+          <button type="button" id="automation-click" class="secondary">Click</button>
+        </form>
+        <pre id="automation-result" class="share-result"></pre>
+        <div class="automation-table-wrap">
+          <table id="automation-table">
+            <thead><tr><th>Text / Description</th><th>Resource ID</th><th>Class</th><th></th></tr></thead>
+            <tbody><tr><td colspan="4">Inspect a screen to list its elements.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <section id="screen-view" class="hidden">

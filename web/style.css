@@ -69,6 +69,9 @@ canvas {
   min-height: 20px; margin: 12px 0 0; color: #9dc1ff;
   white-space: pre-wrap; font-size: 12px;
 }
+.automation-table-wrap { max-height: 360px; overflow: auto; margin-top: 10px; }
+#automation-table td { font-size: 11px; vertical-align: top; }
+#automation-table button { padding: 4px 7px; font-size: 10px; }
 .diagnostics {
   margin-top: 14px; background: #090c11; border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden;

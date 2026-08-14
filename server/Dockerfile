@@ -2,8 +2,11 @@ FROM node:20-bookworm-slim
 
 # adb (android-tools-adb) lets us run `adb start-server` + `adb connect` inside the container
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends adb \
+  && apt-get install -y --no-install-recommends adb python3 python3-venv \
   && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/uia2 \
+  && /opt/uia2/bin/pip install --no-cache-dir uiautomator2==3.7.0
 
 WORKDIR /app
 

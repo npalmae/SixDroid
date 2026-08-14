@@ -13,6 +13,11 @@ const screenLog = document.getElementById("screen-log");
 const shareForm = document.getElementById("share-form");
 const shareTargets = document.getElementById("share-targets");
 const shareResult = document.getElementById("share-result");
+const automationDevice = document.getElementById("automation-device");
+const automationSelector = document.getElementById("automation-selector");
+const automationValue = document.getElementById("automation-value");
+const automationResult = document.getElementById("automation-result");
+const automationTbody = document.querySelector("#automation-table tbody");
 
 let player = null;
 
@@ -46,12 +51,20 @@ async function refresh() {
   }
   if (!portInput.value) portInput.value = suggestPort(instances);
   const selectedPorts = new Set([...shareTargets.querySelectorAll("input:checked")].map((input) => Number(input.value)));
+  const selectedAutomationPort = automationDevice.value;
   shareTargets.innerHTML = "";
   for (const inst of instances.filter((item) => item.status === "running" && item.adbPort)) {
     const label = document.createElement("label");
     const checked = selectedPorts.size ? selectedPorts.has(inst.adbPort) : true;
     label.innerHTML = `<input type="checkbox" value="${inst.adbPort}" ${checked ? "checked" : ""}> ${inst.name} (:${inst.adbPort})`;
     shareTargets.appendChild(label);
+  }
+  automationDevice.innerHTML = instances
+    .filter((item) => item.status === "running" && item.adbPort)
+    .map((item) => `<option value="${item.adbPort}">${item.name} (:${item.adbPort})</option>`)
+    .join("");
+  if ([...automationDevice.options].some((option) => option.value === selectedAutomationPort)) {
+    automationDevice.value = selectedAutomationPort;
   }
   tbody.innerHTML = "";
   for (const inst of instances) {
@@ -158,6 +171,68 @@ shareForm.onsubmit = async (event) => {
     shareResult.textContent = `ERROR: ${error.message}`;
   } finally {
     button.disabled = false;
+  }
+};
+
+async function automate(action, selector = automationSelector.value, value = automationValue.value) {
+  const port = automationDevice.value;
+  if (!port) throw new Error("Select a running Android.");
+  const response = await fetch(`/api/automation/${port}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action, selector: selector ? { resourceId: selector } : {}, value }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || response.statusText);
+  return result;
+}
+
+document.getElementById("automation-inspect").onclick = async () => {
+  automationResult.textContent = "Inspecting screen…";
+  try {
+    const result = await automate("inspect", "", "");
+    automationResult.textContent = `${result.nodes.length} elements found.`;
+    automationTbody.innerHTML = "";
+    for (const node of result.nodes) {
+      const row = document.createElement("tr");
+      const label = node.text || node.description || "-";
+      row.innerHTML = `<td></td><td></td><td></td><td></td>`;
+      row.children[0].textContent = label;
+      row.children[1].textContent = node.resourceId || "-";
+      row.children[2].textContent = node.className.split(".").pop();
+      if (node.resourceId) {
+        const select = document.createElement("button");
+        select.className = "secondary";
+        select.textContent = "Select";
+        select.onclick = () => {
+          automationSelector.value = node.resourceId;
+          if (node.text) automationValue.value = node.text;
+        };
+        row.children[3].appendChild(select);
+      }
+      automationTbody.appendChild(row);
+    }
+  } catch (error) {
+    automationResult.textContent = `ERROR: ${error.message}`;
+  }
+};
+
+document.getElementById("automation-form").onsubmit = async (event) => {
+  event.preventDefault();
+  try {
+    await automate("setText");
+    automationResult.textContent = "Text entered successfully.";
+  } catch (error) {
+    automationResult.textContent = `ERROR: ${error.message}`;
+  }
+};
+
+document.getElementById("automation-click").onclick = async () => {
+  try {
+    await automate("click");
+    automationResult.textContent = "Element clicked successfully.";
+  } catch (error) {
+    automationResult.textContent = `ERROR: ${error.message}`;
   }
 };
 
