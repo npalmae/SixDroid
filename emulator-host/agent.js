@@ -58,8 +58,8 @@ async function create(name, port) {
   await saveRegistry(reg);
   await start(name);
 
-  // adb proxy on ZeroTier (console port + 1)
-  await run("bash", ["-c", `nohup socat TCP-LISTEN:${port + 1},bind=${BIND},reuseaddr,fork TCP:127.0.0.1:${port} > "$HOME/adb-proxy-${name}.log" 2>&1 &`], { timeout: 5000 });
+  // adb proxy on ZeroTier (console port = port, adb port = port + 1)
+  await run("bash", ["-c", `nohup socat TCP-LISTEN:${port + 1},bind=${BIND},reuseaddr,fork TCP:127.0.0.1:${port + 1} > "$HOME/adb-proxy-${name}.log" 2>&1 &`], { timeout: 5000 });
   return { name, port };
 }
 
