@@ -64,7 +64,7 @@ async function refresh() {
   try {
     instances = await api("/api/instances");
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${e.message}</td></tr>`;
     return;
   }
   if (!portInput.value) portInput.value = suggestPort(instances);
@@ -95,7 +95,8 @@ async function refresh() {
     const statusCls = inst.status === "running" ? "status-running" : "status-stopped";
     const booted = inst.status === "running" ? (inst.booted ? " · booted" : " · booting…") : "";
     tr.innerHTML = `
-      <td>${inst.name}${inst.kind === "emulator" ? " · KVM" : ""}</td>
+      <td>${inst.name}</td>
+      <td>${inst.kind === "emulator" ? "VM KVM" : "Contenedor"}</td>
       <td>${inst.androidVersion}${inst.gapps ? " · GApps" : ""}</td>
       <td class="${statusCls}">${inst.status}${booted}</td>
       <td>${inst.adbPort ?? "-"}${inst.host ? ` @${inst.host}` : ""}</td>
@@ -129,7 +130,7 @@ async function refresh() {
     tbody.appendChild(tr);
   }
   if (!instances.length) {
-    tbody.innerHTML = `<tr><td colspan="5">No redroid containers found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">No redroid containers found.</td></tr>`;
   }
 }
 
@@ -329,7 +330,7 @@ createForm.onsubmit = async (e) => {
 
 window.addEventListener("error", (event) => {
   if (tbody.children.length === 0 || tbody.textContent.includes("Loading instances")) {
-    tbody.innerHTML = `<tr><td colspan="5">JavaScript error: ${event.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">JavaScript error: ${event.message}</td></tr>`;
   }
 });
 
