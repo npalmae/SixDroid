@@ -1,5 +1,5 @@
 import http from "node:http";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 
 const listenPort = 8090;
 const deviceHost = process.env.SIXDROID_DEVICE_HOST || "10.176.160.187";
@@ -15,7 +15,9 @@ http.createServer((req, res) => {
     return;
   }
 
-  const args = ["-s", `${host}:${port}`, "--no-audio", "--window-title", `SixDroid - ${name}`];
+  const serial = `${host}:${port}`;
+  try { execFileSync("adb", ["connect", serial], { timeout: 10000 }); } catch {}
+  const args = ["-s", serial, "--no-audio", "--window-title", `SixDroid - ${name}`];
   if (url.searchParams.get("host")) args.push("--mouse=uhid", "--keyboard=uhid", "--max-fps=30");
   const child = spawn("scrcpy", args, { detached: true, stdio: "ignore" });
   child.unref();
