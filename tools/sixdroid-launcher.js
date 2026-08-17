@@ -14,9 +14,9 @@ http.createServer((req, res) => {
     return;
   }
 
-  const child = spawn("scrcpy", [
-    "-s", `${deviceHost}:${port}`, "--no-audio", "--window-title", `SixDroid - ${name}`,
-  ], { detached: true, stdio: "ignore" });
+  const args = ["-s", `${deviceHost}:${port}`, "--no-audio", "--window-title", `SixDroid - ${name}`];
+  if (port === 5559) args.push("--mouse=uhid", "--keyboard=uhid");
+  const child = spawn("scrcpy", args, { detached: true, stdio: "ignore" });
   child.unref();
 
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
