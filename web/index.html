@@ -18,7 +18,13 @@
         <h2>New instance</h2>
         <form id="create-form">
           <label>Name <input id="f-name" required placeholder="my-device" pattern="[a-zA-Z0-9_-]+" /></label>
-          <label>Android
+          <label>Type
+            <select id="f-type">
+              <option value="container">Container (redroid)</option>
+              <option value="emulator">Emulator (Google Play / KVM)</option>
+            </select>
+          </label>
+          <label id="f-version-label">Android
             <select id="f-version">
               <option>11</option>
               <option>12</option>

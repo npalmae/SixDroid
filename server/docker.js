@@ -56,30 +56,51 @@ async function toInstance(c) {
   };
 }
 
+const EMULATOR_AGENT = process.env.EMULATOR_AGENT || "http://10.176.160.231:4780";
+
+async function agentCall(path, body) {
+  const res = await fetch(`${EMULATOR_AGENT}${path}`, body !== undefined ? {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  } : undefined);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || res.statusText);
+  return json;
+}
+
+async function remoteInstances() {
+  try {
+    const items = await agentCall("/instances");
+    return items.map((item) => ({
+      ...item,
+      id: `remote:${item.name}`,
+      managed: true,
+      kind: "emulator",
+      host: new URL(EMULATOR_AGENT).hostname,
+    }));
+  } catch (error) {
+    console.error("emulator agent unavailable", error.message);
+    return [];
+  }
+}
+
 export async function listInstances() {
   const containers = await docker.listContainers({ all: true });
   const redroids = containers.filter((c) =>
     c.Image.startsWith(IMAGE_PREFIX) || c.Labels?.["sixdroid.android"] === "true"
   );
   const local = await Promise.all(redroids.map(toInstance));
-  let remote = [];
-  try {
-    remote = JSON.parse(process.env.REMOTE_ANDROIDS || "[]").map((item) => ({
-      id: `remote:${item.name}`,
-      name: item.name,
-      image: item.image || "remote-android",
-      status: "running",
-      androidVersion: String(item.androidVersion || ""),
-      gapps: Boolean(item.gapps),
-      adbPort: Number(item.adbPort),
-      booted: true,
-      managed: false,
-      kind: "emulator",
-    }));
-  } catch (error) {
-    console.error("Invalid REMOTE_ANDROIDS", error);
-  }
+  const remote = await remoteInstances();
   return [...remote, ...local.map((item) => ({ ...item, managed: true, kind: "container" }))];
+}
+
+export async function createEmulatorInstance({ name, port }) {
+  return agentCall("/instances", { name, port });
+}
+
+export async function remoteAction(name, action) {
+  return agentCall(`/${action}`, { name });
 }
 
 export async function createInstance({ name, androidVersion, port }) {

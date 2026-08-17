@@ -28,10 +28,11 @@ function mapKey(e) {
 }
 
 export class ScreenPlayer {
-  constructor({ canvas, adbPort, onStatus, onLog }) {
+  constructor({ canvas, adbPort, host, onStatus, onLog }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.adbPort = adbPort;
+    this.host = host || "";
     this.onStatus = onStatus || (() => {});
     this.onLog = onLog || (() => {});
     this.decoder = null;
@@ -48,11 +49,12 @@ export class ScreenPlayer {
 
   start() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    this.log(`opening stream websocket /ws/stream/${this.adbPort}`);
-    this.log(`opening control websocket /ws/control/${this.adbPort}`);
-    this.streamWs = new WebSocket(`${proto}://${location.host}/ws/stream/${this.adbPort}`);
+    const suffix = this.host ? `?host=${encodeURIComponent(this.host)}` : "";
+    this.log(`opening stream websocket /ws/stream/${this.adbPort}${suffix}`);
+    this.log(`opening control websocket /ws/control/${this.adbPort}${suffix}`);
+    this.streamWs = new WebSocket(`${proto}://${location.host}/ws/stream/${this.adbPort}${suffix}`);
     this.streamWs.binaryType = "arraybuffer";
-    this.controlWs = new WebSocket(`${proto}://${location.host}/ws/control/${this.adbPort}`);
+    this.controlWs = new WebSocket(`${proto}://${location.host}/ws/control/${this.adbPort}${suffix}`);
     this.streamWs.onopen = () => {
       this.status("connecting…");
       this.log("stream websocket connected");

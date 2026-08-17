@@ -20,6 +20,7 @@ const automationResult = document.getElementById("automation-result");
 const automationTbody = document.querySelector("#automation-table tbody");
 
 let player = null;
+let currentInstances = [];
 
 async function api(path, options) {
   const res = await fetch(path, options && {
@@ -50,18 +51,23 @@ async function refresh() {
     return;
   }
   if (!portInput.value) portInput.value = suggestPort(instances);
-  const selectedPorts = new Set([...shareTargets.querySelectorAll("input:checked")].map((input) => Number(input.value)));
+  currentInstances = instances;
+  const selectedPorts = new Set([...shareTargets.querySelectorAll("input:checked")].map((input) => input.value));
   const selectedAutomationPort = automationDevice.value;
   shareTargets.innerHTML = "";
   for (const inst of instances.filter((item) => item.status === "running" && item.adbPort)) {
     const label = document.createElement("label");
-    const checked = selectedPorts.size ? selectedPorts.has(inst.adbPort) : true;
-    label.innerHTML = `<input type="checkbox" value="${inst.adbPort}" ${checked ? "checked" : ""}> ${inst.name} (:${inst.adbPort})`;
+    const key = inst.host ? `${inst.host}:${inst.adbPort}` : String(inst.adbPort);
+    const checked = selectedPorts.size ? selectedPorts.has(key) : true;
+    label.innerHTML = `<input type="checkbox" value="${key}" ${checked ? "checked" : ""}> ${inst.name} (:${inst.adbPort})`;
     shareTargets.appendChild(label);
   }
   automationDevice.innerHTML = instances
     .filter((item) => item.status === "running" && item.adbPort)
-    .map((item) => `<option value="${item.adbPort}">${item.name} (:${item.adbPort})</option>`)
+    .map((item) => {
+      const key = item.host ? `${item.host}:${item.adbPort}` : String(item.adbPort);
+      return `<option value="${key}">${item.name} (:${item.adbPort})</option>`;
+    })
     .join("");
   if ([...automationDevice.options].some((option) => option.value === selectedAutomationPort)) {
     automationDevice.value = selectedAutomationPort;
@@ -72,10 +78,10 @@ async function refresh() {
     const statusCls = inst.status === "running" ? "status-running" : "status-stopped";
     const booted = inst.status === "running" ? (inst.booted ? " · booted" : " · booting…") : "";
     tr.innerHTML = `
-      <td>${inst.name}</td>
+      <td>${inst.name}${inst.kind === "emulator" ? " · KVM" : ""}</td>
       <td>${inst.androidVersion}${inst.gapps ? " · GApps" : ""}</td>
       <td class="${statusCls}">${inst.status}${booted}</td>
-      <td>${inst.adbPort ?? "-"}</td>
+      <td>${inst.adbPort ?? "-"}${inst.host ? ` @${inst.host}` : ""}</td>
       <td class="actions"></td>`;
     const actions = tr.querySelector(".actions");
     const btn = (label, cls, fn, disabled) => {
@@ -91,6 +97,7 @@ async function refresh() {
       btn("Ver pantalla", "", () => openScreen(inst), !inst.adbPort);
       btn("Abrir scrcpy", "secondary", () => {
         const query = new URLSearchParams({ port: inst.adbPort, name: inst.name });
+        if (inst.host) query.set("host", inst.host);
         window.open(`http://127.0.0.1:8090/open?${query}`, "_blank");
       }, !inst.adbPort);
       if (inst.managed !== false) btn("Stop", "secondary", () => api(`/api/instances/${inst.id}/stop`));
@@ -125,6 +132,7 @@ async function openScreen(inst) {
   player = new ScreenPlayer({
     canvas,
     adbPort: inst.adbPort,
+    host: inst.host,
     onStatus: (s) => (screenStatus.textContent = s),
     onLog: (message) => {
       const time = new Date().toLocaleTimeString();
@@ -149,7 +157,7 @@ document.getElementById("btn-clear-log").onclick = () => (screenLog.textContent 
 shareForm.onsubmit = async (event) => {
   event.preventDefault();
   const file = document.getElementById("share-file").files[0];
-  const ports = [...shareTargets.querySelectorAll("input:checked")].map((input) => Number(input.value));
+  const ports = [...shareTargets.querySelectorAll("input:checked")].map((input) => input.value);
   if (!file || !ports.length) {
     shareResult.textContent = "Select a file and at least one Android.";
     return;
@@ -177,9 +185,11 @@ shareForm.onsubmit = async (event) => {
 };
 
 async function automate(action, selector = automationSelector.value, value = automationValue.value) {
-  const port = automationDevice.value;
-  if (!port) throw new Error("Select a running Android.");
-  const response = await fetch(`/api/automation/${port}`, {
+  const key = automationDevice.value;
+  const inst = currentInstances.find((i) => (i.host ? `${i.host}:${i.adbPort}` : String(i.adbPort)) === key);
+  if (!inst) throw new Error("Select a running Android.");
+  const hostParam = inst.host ? `?host=${encodeURIComponent(inst.host)}` : "";
+  const response = await fetch(`/api/automation/${inst.adbPort}${hostParam}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action, selector: selector ? { resourceId: selector } : {}, value }),
@@ -190,8 +200,10 @@ async function automate(action, selector = automationSelector.value, value = aut
 }
 
 async function remoteAction(body) {
-  const port = automationDevice.value;
-  const response = await fetch(`/api/automation/${port}`, {
+  const key = automationDevice.value;
+  const inst = currentInstances.find((i) => (i.host ? `${i.host}:${i.adbPort}` : String(i.adbPort)) === key);
+  const hostParam = inst?.host ? `?host=${encodeURIComponent(inst.host)}` : "";
+  const response = await fetch(`/api/automation/${inst.adbPort}${hostParam}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -274,13 +286,25 @@ document.querySelectorAll("[data-swipe]").forEach((button) => {
   };
 });
 
+document.getElementById("f-type").onchange = (e) => {
+  document.getElementById("f-version-label").style.display = e.target.value === "emulator" ? "none" : "";
+  if (e.target.value === "emulator") {
+    let p = 5556;
+    const used = new Set([5554, 5555]); // existing emulator host ports
+    while (used.has(p)) p += 2;
+    portInput.value = p;
+  }
+};
+
 createForm.onsubmit = async (e) => {
   e.preventDefault();
+  const type = document.getElementById("f-type").value;
   const body = {
     name: document.getElementById("f-name").value.trim(),
-    androidVersion: document.getElementById("f-version").value,
+    type,
     port: Number(portInput.value),
   };
+  if (type !== "emulator") body.androidVersion = document.getElementById("f-version").value;
   try {
     await api("/api/instances", { body });
     createForm.reset();

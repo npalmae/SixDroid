@@ -11,8 +11,8 @@ export const DEVICE_HOST = process.env.DEVICE_HOST || "10.141.10.152";
 const connector = new AdbServerNodeTcpConnector({ host: "127.0.0.1", port: 5037 });
 export const adbServer = new AdbServerClient(connector);
 
-export async function runAdb(adbPort, args, options = {}) {
-  const serial = `${DEVICE_HOST}:${adbPort}`;
+export async function runAdb(adbPort, args, options = {}, host) {
+  const serial = `${host || DEVICE_HOST}:${adbPort}`;
   await execFileAsync("adb", ["connect", serial]);
   return execFileAsync("adb", ["-s", serial, ...args], {
     maxBuffer: 10 * 1024 * 1024,
@@ -25,8 +25,8 @@ export async function runAdb(adbPort, args, options = {}) {
  * for that device. Retries a couple of times because redroid takes a while
  * to bring adbd up after container start.
  */
-export async function getAdb(adbPort) {
-  const serial = `${DEVICE_HOST}:${adbPort}`;
+export async function getAdb(adbPort, host) {
+  const serial = `${host || DEVICE_HOST}:${adbPort}`;
 
   let lastError;
   for (let attempt = 0; attempt < 10; attempt++) {

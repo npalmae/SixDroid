@@ -13,6 +13,8 @@ import {
   startInstance,
   stopInstance,
   deleteInstance,
+  createEmulatorInstance,
+  remoteAction,
 } from "./docker.js";
 import { getAdb, runAdb } from "./adb.js";
 import { ScrcpySession } from "./scrcpy.js";
@@ -46,24 +48,42 @@ app.get("/api/instances", wrap(async (_req, res) => {
 }));
 
 app.post("/api/instances", wrap(async (req, res) => {
-  const { name, androidVersion, port } = req.body || {};
-  if (!name || !androidVersion || !port) {
-    return res.status(400).json({ error: "name, androidVersion and port are required" });
+  const { name, androidVersion, port, type } = req.body || {};
+  if (!name || !port) {
+    return res.status(400).json({ error: "name and port are required" });
+  }
+  if (type === "emulator") {
+    return res.json(await createEmulatorInstance({ name, port }));
+  }
+  if (!androidVersion) {
+    return res.status(400).json({ error: "androidVersion is required" });
   }
   res.json(await createInstance({ name, androidVersion, port }));
 }));
 
 app.post("/api/instances/:id/start", wrap(async (req, res) => {
+  if (req.params.id.startsWith("remote:")) {
+    await remoteAction(req.params.id.slice(7), "start");
+    return res.json({ ok: true });
+  }
   await startInstance(req.params.id);
   res.json({ ok: true });
 }));
 
 app.post("/api/instances/:id/stop", wrap(async (req, res) => {
+  if (req.params.id.startsWith("remote:")) {
+    await remoteAction(req.params.id.slice(7), "stop");
+    return res.json({ ok: true });
+  }
   await stopInstance(req.params.id);
   res.json({ ok: true });
 }));
 
 app.delete("/api/instances/:id", wrap(async (req, res) => {
+  if (req.params.id.startsWith("remote:")) {
+    await remoteAction(req.params.id.slice(7), "delete");
+    return res.json({ ok: true });
+  }
   await deleteInstance(req.params.id);
   res.json({ ok: true });
 }));
@@ -73,12 +93,14 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
 
   let localPath = req.file.path;
   try {
-    const ports = JSON.parse(req.body.ports || "[]").map(Number);
+    const ports = JSON.parse(req.body.ports || "[]").map(String);
     const action = req.body.action === "install" ? "install" : "copy";
     const safeName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._ -]/g, "_");
     const instances = await listInstances();
-    const allowed = new Map(instances.filter((i) => i.status === "running").map((i) => [i.adbPort, i]));
-    const targets = [...new Set(ports)].filter((port) => allowed.has(port));
+    const allowed = new Map(
+      instances.filter((i) => i.status === "running").map((i) => [i.host ? `${i.host}:${i.adbPort}` : String(i.adbPort), i])
+    );
+    const targets = [...new Set(ports.map(String))].filter((p) => allowed.has(p));
     if (!targets.length) return res.status(400).json({ error: "select at least one running Android" });
     if (action === "install" && !safeName.toLowerCase().endsWith(".apk")) {
       return res.status(400).json({ error: "only APK files can be installed" });
@@ -88,15 +110,16 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
       await fs.rename(req.file.path, localPath);
     }
 
-    const results = await Promise.all(targets.map(async (port) => {
+    const results = await Promise.all(targets.map(async (key) => {
+      const inst = allowed.get(key);
       try {
         const args = action === "install"
           ? ["install", "-r", localPath]
           : ["push", localPath, `/sdcard/Download/${safeName}`];
-        const { stdout, stderr } = await runAdb(port, args, { timeout: 10 * 60 * 1000 });
-        return { port, name: allowed.get(port).name, ok: true, message: (stdout || stderr).trim() };
+        const { stdout, stderr } = await runAdb(inst.adbPort, args, { timeout: 10 * 60 * 1000 }, inst.host);
+        return { port: inst.adbPort, name: inst.name, ok: true, message: (stdout || stderr).trim() };
       } catch (error) {
-        return { port, name: allowed.get(port).name, ok: false, message: error.stderr?.trim() || error.message };
+        return { port: inst.adbPort, name: inst.name, ok: false, message: error.stderr?.trim() || error.message };
       }
     }));
     res.json({ action, filename: safeName, results });
@@ -108,8 +131,12 @@ app.post("/api/files/distribute", upload.single("file"), wrap(async (req, res) =
 
 app.post("/api/automation/:port", wrap(async (req, res) => {
   const port = Number(req.params.port);
+  const host = req.query.host;
   const instances = await listInstances();
-  const instance = instances.find((item) => item.adbPort === port && item.status === "running");
+  const instance = instances.find((item) =>
+    item.adbPort === port && item.status === "running" &&
+    (host ? item.host === host : !item.host)
+  );
   if (!instance) return res.status(404).json({ error: "running Android not found" });
 
   const action = req.body?.action;
@@ -121,9 +148,9 @@ app.post("/api/automation/:port", wrap(async (req, res) => {
     return res.status(400).json({ error: "selector is required" });
   }
 
-  await runAdb(port, ["get-state"], { timeout: 30000 });
+  await runAdb(port, ["get-state"], { timeout: 30000 }, instance.host);
   const payload = JSON.stringify({
-    serial: `${process.env.DEVICE_HOST || "10.141.10.152"}:${port}`,
+    serial: `${instance.host || process.env.DEVICE_HOST || "10.141.10.152"}:${port}`,
     action,
     selector,
     value: String(req.body?.value ?? "").slice(0, 4096),
@@ -154,25 +181,27 @@ app.post("/api/automation/:port", wrap(async (req, res) => {
 
 const server = createServer(app);
 
-// One active scrcpy session per adbPort, shared between stream and control sockets.
-const sessions = new Map(); // adbPort -> { session, starting, refs }
+// One active scrcpy session per device key ("host:port" or bare port).
+const sessions = new Map(); // key -> { session, starting, refs }
 
-async function acquireSession(adbPort) {
-  let entry = sessions.get(adbPort);
+async function acquireSession(adbPort, host) {
+  const key = host ? `${host}:${adbPort}` : String(adbPort);
+  let entry = sessions.get(key);
   if (!entry) {
     const session = new ScrcpySession(null, adbPort);
+    session.host = host;
     entry = { session, refs: 0, starting: null };
-    sessions.set(adbPort, entry);
+    sessions.set(key, entry);
     entry.starting = (async () => {
-      console.log(`[scrcpy:${adbPort}] connecting adb`);
-      session.adb = await getAdb(adbPort);
-      console.log(`[scrcpy:${adbPort}] starting server`);
+      console.log(`[scrcpy:${key}] connecting adb`);
+      session.adb = await getAdb(adbPort, host);
+      console.log(`[scrcpy:${key}] starting server`);
       await session.start();
-      console.log(`[scrcpy:${adbPort}] ready ${session.width}x${session.height}`);
+      console.log(`[scrcpy:${key}] ready ${session.width}x${session.height}`);
     })();
     entry.starting.catch((error) => {
-      console.error(`[scrcpy:${adbPort}] start failed`, error);
-      sessions.delete(adbPort);
+      console.error(`[scrcpy:${key}] start failed`, error);
+      sessions.delete(key);
     });
   }
   await entry.starting;
@@ -180,10 +209,10 @@ async function acquireSession(adbPort) {
   return entry;
 }
 
-function releaseSession(adbPort, entry) {
+function releaseSession(key, entry) {
   entry.refs--;
   if (entry.refs <= 0) {
-    sessions.delete(adbPort);
+    sessions.delete(key);
     entry.session.close();
   }
 }
@@ -191,13 +220,14 @@ function releaseSession(adbPort, entry) {
 const streamWss = new WebSocketServer({ noServer: true });
 const controlWss = new WebSocketServer({ noServer: true });
 
-streamWss.on("connection", async (ws, adbPort) => {
-  console.log(`[ws:${adbPort}] stream connected`);
+streamWss.on("connection", async (ws, adbPort, host) => {
+  const key = host ? `${host}:${adbPort}` : String(adbPort);
+  console.log(`[ws:${key}] stream connected`);
   let entry;
   try {
-    entry = await acquireSession(adbPort);
+    entry = await acquireSession(adbPort, host);
   } catch (e) {
-    console.error(`[ws:${adbPort}] stream failed`, e);
+    console.error(`[ws:${key}] stream failed`, e);
     ws.close(1011, `scrcpy start failed: ${e.message}`);
     return;
   }
@@ -208,20 +238,21 @@ streamWss.on("connection", async (ws, adbPort) => {
   session.flushPackets();
   session.onClose = () => ws.close(1000, "scrcpy exited");
   ws.on("close", () => {
-    console.log(`[ws:${adbPort}] stream closed`);
+    console.log(`[ws:${key}] stream closed`);
     session.onPacket = undefined;
     session.onClose = undefined;
-    releaseSession(adbPort, entry);
+    releaseSession(key, entry);
   });
 });
 
-controlWss.on("connection", async (ws, adbPort) => {
-  console.log(`[ws:${adbPort}] control connected`);
+controlWss.on("connection", async (ws, adbPort, host) => {
+  const key = host ? `${host}:${adbPort}` : String(adbPort);
+  console.log(`[ws:${key}] control connected`);
   let entry;
   try {
-    entry = await acquireSession(adbPort);
+    entry = await acquireSession(adbPort, host);
   } catch (e) {
-    console.error(`[ws:${adbPort}] control failed`, e);
+    console.error(`[ws:${key}] control failed`, e);
     ws.close(1011, `scrcpy start failed: ${e.message}`);
     return;
   }
@@ -239,22 +270,23 @@ controlWss.on("connection", async (ws, adbPort) => {
       else if (msg.type === "text") await session.injectText(String(msg.text));
       if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ ok: true, type: msg.type, action: msg.action }));
     } catch (error) {
-      console.error(`[ws:${adbPort}] control ${msg.type} failed`, error);
+      console.error(`[ws:${key}] control ${msg.type} failed`, error);
       if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ ok: false, error: error.message }));
     }
   });
-  ws.on("close", () => releaseSession(adbPort, entry));
+  ws.on("close", () => releaseSession(key, entry));
 });
 
 server.on("upgrade", (req, socket, head) => {
-  const m = req.url.match(/^\/ws\/(stream|control)\/(\d+)$/);
+  const m = req.url.match(/^\/ws\/(stream|control)\/(\d+)(\?.*)?$/);
   if (!m) {
     socket.destroy();
     return;
   }
   const wss = m[1] === "stream" ? streamWss : controlWss;
   const adbPort = Number(m[2]);
-  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, adbPort));
+  const host = new URL(req.url, "http://x").searchParams.get("host") || undefined;
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, adbPort, host));
 });
 
 server.listen(PORT, () => console.log(`SixDroid listening on :${PORT}`));

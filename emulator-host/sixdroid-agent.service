@@ -1,0 +1,16 @@
+[Unit]
+Description=SixDroid Emulator Agent API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sixmanager
+Group=sixmanager
+Environment=PATH=/home/sixmanager/android-sdk/cmdline-tools/latest/bin:/home/sixmanager/android-sdk/platform-tools:/home/sixmanager/android-sdk/emulator:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/node /home/sixmanager/sixdroid-agent/agent.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
