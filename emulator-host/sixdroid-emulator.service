@@ -1,0 +1,17 @@
+[Unit]
+Description=SixDroid Android 15 Google Play Emulator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sixmanager
+Group=sixmanager
+Environment=ANDROID_HOME=/home/sixmanager/android-sdk
+Environment=ANDROID_SDK_ROOT=/home/sixmanager/android-sdk
+ExecStart=/home/sixmanager/android-sdk/emulator/emulator -avd sixdroid-play-15 -port 5554 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back emulated -camera-front emulated -memory 4096 -cores 4 -no-snapshot-save -skip-adb-auth
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

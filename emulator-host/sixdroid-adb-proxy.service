@@ -1,0 +1,13 @@
+[Unit]
+Description=Expose SixDroid emulator ADB on ZeroTier
+After=network-online.target sixdroid-emulator.service
+Requires=sixdroid-emulator.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP-LISTEN:5555,bind=10.176.160.231,reuseaddr,fork TCP:127.0.0.1:5555
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

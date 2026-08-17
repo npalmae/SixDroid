@@ -93,13 +93,15 @@ async function refresh() {
         const query = new URLSearchParams({ port: inst.adbPort, name: inst.name });
         window.open(`http://127.0.0.1:8090/open?${query}`, "_blank");
       }, !inst.adbPort);
-      btn("Stop", "secondary", () => api(`/api/instances/${inst.id}/stop`));
+      if (inst.managed !== false) btn("Stop", "secondary", () => api(`/api/instances/${inst.id}/stop`));
     } else {
       btn("Start", "secondary", () => api(`/api/instances/${inst.id}/start`));
     }
-    btn("Delete", "danger", () => {
-      if (confirm(`Delete ${inst.name}?`)) return api(`/api/instances/${inst.id}`, { method: "DELETE" });
-    });
+    if (inst.managed !== false) {
+      btn("Delete", "danger", () => {
+        if (confirm(`Delete ${inst.name}?`)) return api(`/api/instances/${inst.id}`, { method: "DELETE" });
+      });
+    }
     tbody.appendChild(tr);
   }
   if (!instances.length) {

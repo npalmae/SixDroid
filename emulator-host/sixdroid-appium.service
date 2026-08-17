@@ -1,0 +1,18 @@
+[Unit]
+Description=SixDroid Appium Server
+After=network-online.target sixdroid-emulator.service
+Requires=sixdroid-emulator.service
+
+[Service]
+Type=simple
+User=sixmanager
+Group=sixmanager
+Environment=ANDROID_HOME=/home/sixmanager/android-sdk
+Environment=ANDROID_SDK_ROOT=/home/sixmanager/android-sdk
+Environment=PATH=/home/sixmanager/android-sdk/platform-tools:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/appium --address 10.176.160.231 --port 4723 --base-path /
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

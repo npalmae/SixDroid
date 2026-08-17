@@ -61,7 +61,25 @@ export async function listInstances() {
   const redroids = containers.filter((c) =>
     c.Image.startsWith(IMAGE_PREFIX) || c.Labels?.["sixdroid.android"] === "true"
   );
-  return Promise.all(redroids.map(toInstance));
+  const local = await Promise.all(redroids.map(toInstance));
+  let remote = [];
+  try {
+    remote = JSON.parse(process.env.REMOTE_ANDROIDS || "[]").map((item) => ({
+      id: `remote:${item.name}`,
+      name: item.name,
+      image: item.image || "remote-android",
+      status: "running",
+      androidVersion: String(item.androidVersion || ""),
+      gapps: Boolean(item.gapps),
+      adbPort: Number(item.adbPort),
+      booted: true,
+      managed: false,
+      kind: "emulator",
+    }));
+  } catch (error) {
+    console.error("Invalid REMOTE_ANDROIDS", error);
+  }
+  return [...remote, ...local.map((item) => ({ ...item, managed: true, kind: "container" }))];
 }
 
 export async function createInstance({ name, androidVersion, port }) {
