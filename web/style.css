@@ -35,6 +35,8 @@ input, select {
   border: 1px solid var(--border); border-radius: 6px;
   padding: 8px 10px; font: inherit;
 }
+label.checkbox-label { flex-direction: row; align-items: center; color: var(--fg); }
+label.checkbox-label input { width: auto; }
 button {
   background: var(--accent); color: #fff; border: 0; border-radius: 6px;
   padding: 8px 14px; font: inherit; cursor: pointer;

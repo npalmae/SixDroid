@@ -9,6 +9,7 @@ services:
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./apks:/apks:ro
     environment:
       DEVICE_HOST: ${DEVICE_HOST:-10.141.10.152}
-      REMOTE_ANDROIDS: '${REMOTE_ANDROIDS:-[{"name":"avd-play15","image":"google-play-avd","androidVersion":"15","gapps":true,"adbPort":5559}]}'
+      EMULATOR_AGENT: ${EMULATOR_AGENT:-http://10.176.160.231:4780}

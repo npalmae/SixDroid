@@ -91,12 +91,32 @@ async function remove(name) {
   if (port) await run("bash", ["-c", `pkill -f "TCP-LISTEN:${port + 1}" || true`], { timeout: 5000 }).catch(() => {});
 }
 
+async function authorize(name) {
+  const reg = await loadRegistry();
+  const entry = reg[name];
+  if (!entry) throw new Error("unknown AVD");
+  const serial = `emulator-${entry.port}`;
+  // Wait for the "Allow USB debugging?" dialog and accept it ("Always allow").
+  for (let i = 0; i < 30; i++) {
+    const { stdout } = await run("adb", ["-s", serial, "exec-out", "uiautomator", "dump", "/dev/tty"], { env: ENV, timeout: 15000 }).catch(() => ({ stdout: "" }));
+    if (stdout.includes("Allow USB debugging")) {
+      await run("adb", ["-s", serial, "shell", "input", "tap", "540", "1265"], { env: ENV, timeout: 10000 });
+      await run("adb", ["-s", serial, "shell", "input", "tap", "895", "1430"], { env: ENV, timeout: 10000 });
+      return { ok: true };
+    }
+    if (stdout.includes("Home") || stdout.includes("launcher")) return { ok: true, note: "no dialog" };
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { ok: false, error: "dialog not found" };
+}
+
 const routes = {
   "GET /instances": () => list(),
   "POST /instances": (b) => create(b.name, b.port),
   "POST /start": (b) => start(b.name),
   "POST /stop": (b) => stop(b.name),
   "POST /delete": (b) => remove(b.name),
+  "POST /authorize": (b) => authorize(b.name),
 };
 
 http.createServer(async (req, res) => {

@@ -48,7 +48,7 @@ app.get("/api/instances", wrap(async (_req, res) => {
 }));
 
 app.post("/api/instances", wrap(async (req, res) => {
-  const { name, androidVersion, port, type } = req.body || {};
+  const { name, androidVersion, port, type, installWhatsapp } = req.body || {};
   if (!name || !port) {
     return res.status(400).json({ error: "name and port are required" });
   }
@@ -66,7 +66,9 @@ app.post("/api/instances", wrap(async (req, res) => {
     if (used.has(Number(port)) || used.has(Number(port) + 1)) {
       return res.status(409).json({ error: "port already in use" });
     }
-    return res.json(await createEmulatorInstance({ name, port }));
+    const result = await createEmulatorInstance({ name, port });
+    if (installWhatsapp) provisionWhatsapp({ name, host: EMULATOR_HOST, adbPort: Number(port) + 1, emulatorName: name });
+    return res.json(result);
   }
   if (used.has(Number(port))) {
     return res.status(409).json({ error: "port already in use" });
@@ -74,7 +76,43 @@ app.post("/api/instances", wrap(async (req, res) => {
   if (!androidVersion) {
     return res.status(400).json({ error: "androidVersion is required" });
   }
-  res.json(await createInstance({ name, androidVersion, port }));
+  const result = await createInstance({ name, androidVersion, port });
+  if (installWhatsapp) provisionWhatsapp({ name, host: undefined, adbPort: Number(port) });
+  res.json(result);
+}));
+
+const EMULATOR_HOST = new URL(process.env.EMULATOR_AGENT || "http://10.176.160.231:4780").hostname;
+const WHATSAPP_APK = "/apks/WhatsApp.apk";
+
+// Background: wait for boot, authorize adb (AVDs), install WhatsApp.
+async function provisionWhatsapp({ name, host, adbPort, emulatorName }) {
+  console.log(`[provision:${name}] waiting for boot`);
+  for (let i = 0; i < 120; i++) {
+    try {
+      const { stdout } = await runAdb(adbPort, ["shell", "getprop", "sys.boot_completed"], { timeout: 15000 }, host);
+      if (stdout.includes("1")) break;
+    } catch {
+      /* not ready yet */
+    }
+    if (emulatorName && i % 6 === 5) {
+      await remoteAction(emulatorName, "authorize").catch(() => {});
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  try {
+    await runAdb(adbPort, ["install", "-r", WHATSAPP_APK], { timeout: 10 * 60 * 1000 }, host);
+    console.log(`[provision:${name}] WhatsApp installed`);
+  } catch (error) {
+    console.error(`[provision:${name}] WhatsApp install failed`, error.message);
+  }
+}
+
+app.post("/api/instances/:id/whatsapp", wrap(async (req, res) => {
+  const instances = await listInstances();
+  const inst = instances.find((i) => i.id === req.params.id);
+  if (!inst || inst.status !== "running") return res.status(404).json({ error: "running instance not found" });
+  await runAdb(inst.adbPort, ["install", "-r", WHATSAPP_APK], { timeout: 10 * 60 * 1000 }, inst.host);
+  res.json({ ok: true });
 }));
 
 app.post("/api/instances/:id/start", wrap(async (req, res) => {

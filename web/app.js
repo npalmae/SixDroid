@@ -118,6 +118,7 @@ async function refresh() {
         if (inst.host) query.set("host", inst.host);
         window.open(`http://127.0.0.1:8090/open?${query}`, "_blank");
       }, !inst.adbPort);
+      btn("WhatsApp", "secondary", () => api(`/api/instances/${inst.id}/whatsapp`), !inst.adbPort);
       if (inst.managed !== false) btn("Stop", "secondary", () => api(`/api/instances/${inst.id}/stop`));
     } else {
       btn("Start", "secondary", () => api(`/api/instances/${inst.id}/start`));
@@ -317,7 +318,8 @@ createForm.onsubmit = async (e) => {
     type,
     port: Number(portInput.value),
   };
-  if (type !== "emulator") body.androidVersion = document.getElementById("f-version").value;
+    if (type !== "emulator") body.androidVersion = document.getElementById("f-version").value;
+  body.installWhatsapp = document.getElementById("f-whatsapp").checked;
   try {
     await api("/api/instances", { body });
     createForm.reset();
