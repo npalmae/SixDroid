@@ -11,6 +11,8 @@ Environment=PATH=/home/sixmanager/android-sdk/cmdline-tools/latest/bin:/home/six
 ExecStart=/usr/bin/node /home/sixmanager/sixdroid-agent/agent.js
 Restart=always
 RestartSec=5
+# Do not kill emulator/socat child processes when the agent restarts.
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
