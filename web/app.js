@@ -35,10 +35,27 @@ async function api(path, options) {
   return res.json();
 }
 
+function usedPorts(instances) {
+  const used = new Set();
+  for (const i of instances) {
+    if (!i.adbPort) continue;
+    used.add(i.adbPort);
+    if (i.kind === "emulator") used.add(i.adbPort - 1); // console port
+  }
+  return used;
+}
+
 function suggestPort(instances) {
-  const used = new Set(instances.map((i) => i.adbPort).filter(Boolean));
+  const used = usedPorts(instances);
   let p = 5555;
   while (used.has(p)) p++;
+  return p;
+}
+
+function suggestEmulatorPort(instances) {
+  const used = usedPorts(instances);
+  let p = 5554;
+  while (used.has(p) || used.has(p + 1)) p += 2;
   return p;
 }
 
@@ -288,15 +305,7 @@ document.querySelectorAll("[data-swipe]").forEach((button) => {
 
 document.getElementById("f-type").onchange = (e) => {
   document.getElementById("f-version-label").style.display = e.target.value === "emulator" ? "none" : "";
-  if (e.target.value === "emulator") {
-    // emulator console ports are even; adb = port+1
-    const used = new Set(
-      currentInstances.filter((i) => i.kind === "emulator").flatMap((i) => [i.adbPort - 1, i.adbPort])
-    );
-    let p = 5554;
-    while (used.has(p)) p += 2;
-    portInput.value = p;
-  }
+  portInput.value = e.target.value === "emulator" ? suggestEmulatorPort(currentInstances) : suggestPort(currentInstances);
 };
 
 createForm.onsubmit = async (e) => {

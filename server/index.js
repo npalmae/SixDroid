@@ -52,8 +52,24 @@ app.post("/api/instances", wrap(async (req, res) => {
   if (!name || !port) {
     return res.status(400).json({ error: "name and port are required" });
   }
+  const instances = await listInstances();
+  const used = new Set();
+  for (const i of instances) {
+    if (!i.adbPort) continue;
+    used.add(i.adbPort);
+    if (i.kind === "emulator") used.add(i.adbPort - 1);
+  }
+  if (instances.some((i) => i.name === name || i.name === `sixdroid-${name}`)) {
+    return res.status(409).json({ error: "name already exists" });
+  }
   if (type === "emulator") {
+    if (used.has(Number(port)) || used.has(Number(port) + 1)) {
+      return res.status(409).json({ error: "port already in use" });
+    }
     return res.json(await createEmulatorInstance({ name, port }));
+  }
+  if (used.has(Number(port))) {
+    return res.status(409).json({ error: "port already in use" });
   }
   if (!androidVersion) {
     return res.status(400).json({ error: "androidVersion is required" });
