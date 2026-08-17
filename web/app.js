@@ -289,8 +289,11 @@ document.querySelectorAll("[data-swipe]").forEach((button) => {
 document.getElementById("f-type").onchange = (e) => {
   document.getElementById("f-version-label").style.display = e.target.value === "emulator" ? "none" : "";
   if (e.target.value === "emulator") {
-    let p = 5556;
-    const used = new Set([5554, 5555]); // existing emulator host ports
+    // emulator console ports are even; adb = port+1
+    const used = new Set(
+      currentInstances.filter((i) => i.kind === "emulator").flatMap((i) => [i.adbPort - 1, i.adbPort])
+    );
+    let p = 5554;
     while (used.has(p)) p += 2;
     portInput.value = p;
   }
