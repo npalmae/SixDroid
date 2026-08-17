@@ -70,7 +70,7 @@ async function start(name) {
   const state = await avdState(name, entry.port);
   if (state.status === "running") return;
   await run("bash", ["-c",
-    `nohup emulator -avd "${name}" -port ${entry.port} -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back emulated -camera-front emulated -memory 4096 -cores 4 -no-snapshot-save -skip-adb-auth > "$HOME/emulator-${name}.log" 2>&1 &`
+    `nohup emulator -avd "${name}" -port ${entry.port} -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back emulated -camera-front emulated -memory 8192 -cores 8 -no-snapshot-save -skip-adb-auth > "$HOME/emulator-${name}.log" 2>&1 &`
   ], { env: ENV, timeout: 5000 });
 }
 

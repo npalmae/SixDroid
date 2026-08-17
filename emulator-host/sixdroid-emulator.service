@@ -9,7 +9,7 @@ User=sixmanager
 Group=sixmanager
 Environment=ANDROID_HOME=/home/sixmanager/android-sdk
 Environment=ANDROID_SDK_ROOT=/home/sixmanager/android-sdk
-ExecStart=/home/sixmanager/android-sdk/emulator/emulator -avd sixdroid-play-15 -port 5554 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back emulated -camera-front emulated -memory 4096 -cores 4 -no-snapshot-save -skip-adb-auth
+ExecStart=/home/sixmanager/android-sdk/emulator/emulator -avd sixdroid-play-15 -port 5554 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -camera-back emulated -camera-front emulated -memory 8192 -cores 8 -no-snapshot-save -skip-adb-auth
 Restart=always
 RestartSec=10
 
