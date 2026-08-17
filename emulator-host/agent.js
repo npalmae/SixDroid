@@ -96,15 +96,22 @@ async function authorize(name) {
   const entry = reg[name];
   if (!entry) throw new Error("unknown AVD");
   const serial = `emulator-${entry.port}`;
+  const tapNode = async (dump, resourceId) => {
+    const m = dump.match(new RegExp(`resource-id="android:id/${resourceId}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`))
+      || dump.match(new RegExp(`bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*resource-id="android:id/${resourceId}"`));
+    if (!m) return false;
+    const x = Math.round((Number(m[1]) + Number(m[3])) / 2);
+    const y = Math.round((Number(m[2]) + Number(m[4])) / 2);
+    await run("adb", ["-s", serial, "shell", "input", "tap", String(x), String(y)], { env: ENV, timeout: 10000 });
+    return true;
+  };
   // Wait for the "Allow USB debugging?" dialog and accept it ("Always allow").
   for (let i = 0; i < 30; i++) {
     const { stdout } = await run("adb", ["-s", serial, "exec-out", "uiautomator", "dump", "/dev/tty"], { env: ENV, timeout: 15000 }).catch(() => ({ stdout: "" }));
     if (stdout.includes("Allow USB debugging")) {
-      await run("adb", ["-s", serial, "shell", "input", "tap", "540", "1265"], { env: ENV, timeout: 10000 });
-      await run("adb", ["-s", serial, "shell", "input", "tap", "895", "1430"], { env: ENV, timeout: 10000 });
-      return { ok: true };
+      await tapNode(stdout, "alwaysUse");
+      if (await tapNode(stdout, "button1")) return { ok: true };
     }
-    if (stdout.includes("Home") || stdout.includes("launcher")) return { ok: true, note: "no dialog" };
     await new Promise((r) => setTimeout(r, 2000));
   }
   return { ok: false, error: "dialog not found" };
